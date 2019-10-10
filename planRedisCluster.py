@@ -8,13 +8,15 @@ from pathlib import Path
 from pkg_resources import resource_filename
 
 # Search product filter
-FLT = '[{{"Field": "tenancy", "Value": "shared", "Type": "TERM_MATCH"}},'\
-      '{{"Field": "operatingSystem", "Value": "Linux", "Type": "TERM_MATCH"}},'\
-      '{{"Field": "preInstalledSw", "Value": "NA", "Type": "TERM_MATCH"}},'\
-      '{{"Field": "instanceType", "Value": "{t}", "Type": "TERM_MATCH"}},'\
-      '{{"Field": "LeaseContractLength", "Value": "1yr", "Type": "TERM_MATCH"}},'\
-      '{{"Field": "PurchaseOption", "Value": "All Upfront", "Type": "TERM_MATCH"}},'\
-      '{{"Field": "location", "Value": "{r}", "Type": "TERM_MATCH"}}]'
+machinesFilter =    '[{{"Field": "tenancy", "Value": "shared", "Type": "TERM_MATCH"}},'\
+                    '{{"Field": "operatingSystem", "Value": "Linux", "Type": "TERM_MATCH"}},'\
+                    '{{"Field": "preInstalledSw", "Value": "NA", "Type": "TERM_MATCH"}},'\
+                    '{{"Field": "instanceType", "Value": "{t}", "Type": "TERM_MATCH"}},'\
+                    '{{"Field": "location", "Value": "{r}", "Type": "TERM_MATCH"}}]'
+
+# Search product filter
+ebsFilter = '[{{"Field": "volumeType", "Value": "General Purpose", "Type": "TERM_MATCH"}},'\
+            '{{"Field": "location", "Value": "{r}", "Type": "TERM_MATCH"}}]'
 
       
 # Translate region code to region name
@@ -32,25 +34,53 @@ def getColumns():
     cols = ['Region', 'Type', 'Quantity', 'Quantity Measurement', 'Price Per Unit', 'Convertible Price/Unit Reserved', 'Price Period']
     return cols
 
-def getMachinePrices(region, machine):
+def getEBSPrice(region):
     session = boto3.Session(
         aws_access_key_id=inputParams['aws_access_key_id'], 
         aws_secret_access_key=inputParams['aws_secret_access_key'],
         region_name=inputParams['pricingRegion'])
     pr = session.client('pricing')
-    f = FLT.format(r=get_region_name(region), t=machine)
+    f = ebsFilter.format(r=get_region_name(region))
     response = pr.get_products(ServiceCode='AmazonEC2', Filters=json.loads(f))
     response = json.loads(response['PriceList'][0])
     terms = response['terms']
-    for term in terms['Reserved'].values():
-        leaseContractLength = term['termAttributes']['LeaseContractLength']
-        offeringClass = term['termAttributes']['OfferingClass']
-        purchaseOption = term['termAttributes']['PurchaseOption']
-        if offeringClass == 'convertible' and leaseContractLength == '1yr' and purchaseOption == 'All Upfront':
+    for term in terms['OnDemand'].values():
+        for price in term["priceDimensions"].values():
+            price = price['pricePerUnit']["USD"]
+            if float(price) > 0:
+                return float(price)
+
+
+def getMachinePrices(region, machine, isConvertible):
+    session = boto3.Session(
+        aws_access_key_id=inputParams['aws_access_key_id'], 
+        aws_secret_access_key=inputParams['aws_secret_access_key'],
+        region_name=inputParams['pricingRegion'])
+    pr = session.client('pricing')
+    f = machinesFilter.format(r=get_region_name(region), t=machine)
+    response = pr.get_products(ServiceCode='AmazonEC2', Filters=json.loads(f))
+    response = json.loads(response['PriceList'][0])
+    terms = response['terms']
+    if isConvertible:
+        if 'Reserved' in terms.keys():
+            for term in terms['Reserved'].values():
+                leaseContractLength = term['termAttributes']['LeaseContractLength']
+                offeringClass = term['termAttributes']['OfferingClass']
+                purchaseOption = term['termAttributes']['PurchaseOption']
+                if offeringClass == 'convertible' and leaseContractLength == '1yr' and purchaseOption == 'All Upfront':
+                    for price in term["priceDimensions"].values():
+                        price = price['pricePerUnit']["USD"]
+                        if float(price) > 0:
+                            return float(price)
+        else:
+            return 0
+    else:
+        for term in terms['OnDemand'].values():
             for price in term["priceDimensions"].values():
                 price = price['pricePerUnit']["USD"]
                 if float(price) > 0:
                     return float(price)
+
 
 def createSubscription(inputFile, isAZ):
     """Call the create subscription API according to the input file
@@ -149,20 +179,20 @@ def writeResult(inputFile, outputFile, data):
 
     index = 0
     for row in data['resource']['pricing']:
-        price = row['pricePerUnit']
-        pricePeriod = row['pricePeriod']
         if row['type'] == 'Shards':
             price = ''
             pricePeriod = ''
 
         elif row['type'] == 'EBS Volume':
-            price = price * 744 *12
+            price = getEBSPrice(region)
+            price = price * int(row['quantity']) * 12
             pricePeriod = 'Year'
         
         else:
-            price = price * 744 *12
             pricePeriod = 'Year'
-            convertiblePrice = getMachinePrices(region, row['type'])
+            convertiblePrice = getMachinePrices(region, row['type'], True)
+            price = getMachinePrices(region, row['type'], False)
+            price = price * 744 *12
 
         outDF.loc[index] = [region, row['type'], row['quantity'], row['quantityMeasurement'], price, convertiblePrice, pricePeriod]
         index = index + 1
@@ -207,6 +237,9 @@ def processSubscriptionRequest(inputFile, outputFile, taskId):
 
 with open('planClusterConfig.json') as config_file:
     inputParams = json.load(config_file)
+
+convertiblePrice = getMachinePrices('ap-southeast-1', 'r5.12xlarge', True)
+pr = getEBSPrice('us-east-1')
 
 rootUrl = inputParams['plannerURL']
 s = requests.Session()

@@ -83,7 +83,7 @@ def processDB(index, outIndex):
 
     if numberOfReplicas:
         dbSize = dbSize * (i - index)
-        dbSize = dbSize / (numberOfReplicas + 1)
+        dbSize = dbSize / numberOfReplicas
 
     # if i > index + 1:
     #     clustered = 1
