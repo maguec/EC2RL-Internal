@@ -175,6 +175,7 @@ def writeResult(data):
     inputDF = pd.read_excel(inputFile)
     region = inputDF.iloc[0]['Region']
     convertiblePrice = ''
+    totalPrice = 0.0
 
     index = 0
     for row in data['resource']['pricing']:
@@ -185,6 +186,7 @@ def writeResult(data):
         elif row['type'] == 'EBS Volume':
             price = getEBSPrice(region)
             price = price * int(row['quantity']) * 12
+            totalPrice = totalPrice + price
             pricePeriod = 'Year'
         
         else:
@@ -192,9 +194,13 @@ def writeResult(data):
             convertiblePrice = getMachinePrices(region, row['type'], True)
             price = getMachinePrices(region, row['type'], False)
             price = price * 744 *12
+            totalPrice = totalPrice + price * int(row['quantity'])
 
         outDF.loc[index] = [region, row['type'], row['quantity'], row['quantityMeasurement'], price, convertiblePrice, pricePeriod]
         index = index + 1
+
+    # write total price
+    outDF.loc[index] = ['', '', '', 'Total Price:', totalPrice, '', pricePeriod]
     outDF.to_excel(writer, 'Cluster Plan')
 
     # write the input data to the Input Data tab
