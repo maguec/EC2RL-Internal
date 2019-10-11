@@ -82,10 +82,9 @@ def getMachinePrices(region, machine, isConvertible):
                     return float(price)
 
 
-def createSubscription(inputFile, isAZ):
+def createSubscription(isAZ):
     """Call the create subscription API according to the input file
     Args:
-        inputFile (string): The file path that holds the information for creating a cluster
         isAz (string): Does the cluster need to support multi AZ ('true'/'false')
     Returns:
         taskId (string): The task id that holds the response for the create subscription
@@ -102,7 +101,7 @@ def createSubscription(inputFile, isAZ):
         "paymentMethodId": 8240,
         "cloudProviders": [
         {
-            "cloudAccountId": 9838,
+            "cloudAccountId": cloudAccountId,
             "regions": [
             {
                 "region": region,
@@ -162,7 +161,7 @@ def createSubscription(inputFile, isAZ):
         return None
 
 
-def writeResult(inputFile, outputFile, data):
+def writeResult(data):
     """Write the cluster costs to the output file
     Args:
         outputFile (string): The file path to write cluster costs
@@ -200,12 +199,15 @@ def writeResult(inputFile, outputFile, data):
 
     # write the input data to the Input Data tab
     inputDF.to_excel(writer, 'Input Data')
+    if rawDataFile != '':
+        rawDF = pd.read_csv(rawDataFile)
+        rawDF.to_excel(writer, 'Raw Data')
 
     writer.save()
 
 
 
-def processSubscriptionRequest(inputFile, outputFile, taskId):
+def processSubscriptionRequest(taskId):
     """Write the cluster costs to the output file
     Args:
         outputFile (string): The file path to write cluster costs
@@ -226,7 +228,7 @@ def processSubscriptionRequest(inputFile, outputFile, taskId):
             if jData['status'] == "processing-in-progress":
                 time.sleep(10)
             if jData['status'] == "processing-completed":
-                writeResult(inputFile, outputFile, jData['response'])
+                writeResult(jData['response'])
                 taskPending = False
             if jData['status'] == "processing-error":
                 print("Failed to create subscription: " + jData['response']['error']['description'])
@@ -242,6 +244,8 @@ convertiblePrice = getMachinePrices('ap-southeast-1', 'r5.12xlarge', True)
 pr = getEBSPrice('us-east-1')
 
 rootUrl = inputParams['plannerURL']
+cloudAccountId = inputParams['cloudAccountId']
+
 s = requests.Session()
 s.headers.update(
     {
@@ -251,8 +255,9 @@ s.headers.update(
     })
 
 inputFile = inputParams['inputFile']
+rawDataFile = inputParams['rawDataFile']
 outputFile = Path(inputFile).stem + "-pricing" + ".xlsx"
 isAZ='false'
 
-taskId = createSubscription(inputFile, isAZ=isAZ)
-processSubscriptionRequest(inputFile, outputFile, taskId)
+taskId = createSubscription(isAZ=isAZ)
+processSubscriptionRequest(taskId)
