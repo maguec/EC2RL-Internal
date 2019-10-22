@@ -36,7 +36,7 @@ You can see a sample out put samplePlannedCluster.xlsx in the outputs folder.
 
 ```
 # Clone:
-git clone https://github.com/ohadisraeli/ecmigrator
+git clone https://github.com/Redislabs-Solution-Architects/EC2RL-Internal
 
 # Prepare virtualenv:
 cd ecmigrator
