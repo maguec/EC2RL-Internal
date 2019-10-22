@@ -8,8 +8,7 @@ from pathlib import Path
 from pkg_resources import resource_filename
 
 # Search product filter
-machinesFilter =    '[{{"Field": "tenancy", "Value": "shared", "Type": "TERM_MATCH"}},'\
-                    '{{"Field": "operatingSystem", "Value": "Linux", "Type": "TERM_MATCH"}},'\
+machinesFilter =    '[{{"Field": "operatingSystem", "Value": "Linux", "Type": "TERM_MATCH"}},'\
                     '{{"Field": "preInstalledSw", "Value": "NA", "Type": "TERM_MATCH"}},'\
                     '{{"Field": "instanceType", "Value": "{t}", "Type": "TERM_MATCH"}},'\
                     '{{"Field": "location", "Value": "{r}", "Type": "TERM_MATCH"}}]'
@@ -57,6 +56,7 @@ def getMachinePrices(region, machine, isConvertible):
         aws_secret_access_key=inputParams['aws_secret_access_key'],
         region_name=inputParams['pricingRegion'])
     pr = session.client('pricing')
+
     f = machinesFilter.format(r=get_region_name(region), t=machine)
     response = pr.get_products(ServiceCode='AmazonEC2', Filters=json.loads(f))
     response = json.loads(response['PriceList'][0])
@@ -80,6 +80,8 @@ def getMachinePrices(region, machine, isConvertible):
                 price = price['pricePerUnit']["USD"]
                 if float(price) > 0:
                     return float(price)
+    # if for some reason cannot find pricing return 0
+    return 0
 
 
 def createSubscription(isAZ):
@@ -246,8 +248,7 @@ def processSubscriptionRequest(taskId):
 with open('planClusterConfig.json') as config_file:
     inputParams = json.load(config_file)
 
-convertiblePrice = getMachinePrices('ap-southeast-1', 'r5.12xlarge', True)
-pr = getEBSPrice('us-east-1')
+convertiblePrice = getMachinePrices('ap-southeast-1', 'r5.24xlarge', False)
 
 rootUrl = inputParams['plannerURL']
 cloudAccountId = inputParams['cloudAccountId']
