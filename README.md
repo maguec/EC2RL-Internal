@@ -39,7 +39,7 @@ You can see a sample out put samplePlannedCluster.xlsx in the outputs folder.
 git clone https://github.com/Redislabs-Solution-Architects/EC2RL-Internal
 
 # Prepare virtualenv:
-cd ecmigrator
+cd EC2RL-Internal
 mkdir .env
 virtualenv .env
 
@@ -97,4 +97,8 @@ The planClusterConfig.json should contain the following information
     "aws_access_key_id": "Your AWS Access Key",
     "aws_secret_access_key": "Your AWS Secret Key",
     "pricingRegion": "Should always be us-east-1"
-}```
+}
+```
+### TBD
+* Add GCP to planRedisCluster
+* For some regions convertible price is missing
