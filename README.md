@@ -46,12 +46,8 @@ virtualenv .env
 # Activate virtualenv
 . .env/bin/activate
 
-# Install boto3
-pip install boto3
-pip install pandas
-pip install xlsxwriter
-pip install requests
-pip install xlrd
+# Install necessary libraries
+pip install -r requirements.txt
 
 # When finished
 deactivate
