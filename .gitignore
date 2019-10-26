@@ -6,3 +6,4 @@
 
 # Ensure that someone doesn't accidentally check in their credentials
 planClusterConfig.json
+pullStatsConfig.json 
