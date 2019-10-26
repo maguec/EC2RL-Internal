@@ -1,0 +1,5 @@
+# Ignore Mac 
+.DS_Store
+
+# We don't want .env checked in
+.env
