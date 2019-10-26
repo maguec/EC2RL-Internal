@@ -3,3 +3,6 @@
 
 # We don't want .env checked in
 .env
+
+# Ensure that someone doesn't accidentally check in their credentials
+planClusterConfig.json
